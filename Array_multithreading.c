@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define SIZE 300
 #define SIZE_ARR 10
@@ -9,52 +11,60 @@
 
 float arr[SIZE] = {0};
 
+
 float merg_arr1[SIZE_ARR] = {0.111,  0.222,  0.333,  0.444,  0.555,  0.557,  0.657,  0.735,  0.834,  0.868};
 float merg_arr2[SIZE_ARR] = {0.145,  0.168,  0.255,  0.279,  0.345,  0.407,  0.478,  0.563,  0.648,  0.789};
 float resmerg_arr[SIZE_ARR*2] = {0};
 
 int cmp(const void *a, const void *b);
-void func_random(float arr[]);
+void initial_array(float arr[], int size);
 void func_merg(float merg_arr1[],float merg_arr2[]);
+void worker(int part, int total);
 
 int main(int argc, char **argv)
 {
 	int i = 0;
-	int number = 0;
-	int total = 0;
 
-	if(3 != argc)
+	if(2 != argc)
 	{
-		printf("Error: invalid input params (expect 2 values)");
+		printf("Error: invalid input param (expect 1 value)");
 		return 1;
 	}
 
-	number = atoi(argv[1]);
-	total = atoi(argv[2]);
+	int total = atoi(argv[1]);
 
-	if((0 > number)&&(number > total) && (0 <= total))
+	if(0 >= total)
 	{
-		printf("Error: invalid values in params");
+		printf("Error: invalid values in params: total = %d\n",total);
 		return 1;
 	}
+	initial_array(arr, SIZE);
+	for(i = 0; i<total; i++)
+	{
+		if( 0 == fork())
+		{
+			/* run child worker */
+			worker(i,total);
+		}
+		else
+		{
+			/*parent do nothing */
+		   sleep(2);
+		}
+	}
 
-	printf("number = %d total = %d\n", number, total);
-
-	func_random(arr);
-	printf("sort from %d to %d\n", SIZE/total*number, SIZE/total*number + SIZE/total);
-	qsort(&arr[SIZE/total*number], SIZE/total, sizeof(float), cmp);
-	printf("After sort\n");
+/*	printf("After sort\n");
 	for(i = 0; i < SIZE; i++)
 	{
 		printf("%d %f\n", i, arr[i]);
 	}
-	func_merg(merg_arr1,merg_arr2);
+
 	printf("Resmerg_arr\n");
 	for(int k = 0; k< SIZE_ARR*2; k++)
 	{
 		printf("%d " "%f\n", k, resmerg_arr[k]);
 	}
-
+*/
 	return EXIT_SUCCESS;
 }
 ///////////////////////////////////////
@@ -62,11 +72,11 @@ int cmp(const void *a, const void *b) {
 	return ( *(float*)a > *(float*)b) ? 1 : -1;
  }
 ////////////////////////////////////////////////
-void func_random(float arr[])
+void initial_array(float arr[], int size)
 {
 #if 0
 	int j = 0;
-	for( j = 0; j < SIZE; j++)
+	for( j = 0; j < size; j++)
 	{
 		arr[j] = (float)(rand() % 1000) / 1000;
 		printf("%6.3f ",arr[j]);
@@ -104,12 +114,17 @@ void func_random(float arr[])
   0.881,  0.930,  0.933,  0.894,  0.660,  0.163,  0.199,  0.981,  0.899,  0.996,
   0.959,  0.773,  0.813,  0.668,  0.190,  0.095,  0.926,  0.466,  0.084,  0.340
 };
-memcpy(arr,local_arr,sizeof(float)*SIZE);
+memcpy(arr,local_arr,sizeof(float)*size);
 printf("Print arr[]\n");
-for(int i = 0; i<SIZE; i++)
+for(int i = 0; i<size; i++)
 {
-	printf("%6.3f\n",arr[i]);
+	if((0 == i%10)&&(i != 0))
+	{
+		printf("\n");
+	}
+	printf("%6.3f", arr[i]);
 }
+printf("\n");
 printf("End print arr[]\n");
 #endif
 }
@@ -136,5 +151,21 @@ void func_merg(float merg_arr1[], float merg_arr2[])
 	while (j < SIZE_ARR)
 	{
 		resmerg_arr[k++] = merg_arr2[j++];
+	}
+}
+///////////////////////////////////////////////////////////////
+void worker(int part, int total)
+{
+	int i = 0;
+	printf("part = %d total thread = %d\n", part, total);
+	qsort(&arr[SIZE/total*part], SIZE/total, sizeof(float), cmp);
+	for( i = SIZE/total*part; i < SIZE/total*part+SIZE/total; i+=10)
+	{
+		printf("{%2d} [%d] "
+				"%6.3f %6.3f %6.3f %6.3f %6.3f "
+				"%6.3f %6.3f %6.3f %6.3f %6.3f\n",
+				part, i,
+				arr[i],   arr[i+1], arr[i+2], arr[i+3], arr[i+4],
+				arr[i+5], arr[i+6], arr[i+7], arr[i+8], arr[i+9]);
 	}
 }
