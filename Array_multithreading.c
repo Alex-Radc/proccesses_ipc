@@ -12,6 +12,7 @@
 #define CMP_LT(a, b) ((a) < (b))
 
 float arr[SIZE] ={ 0 };
+static int counter = 0;
 
 float merg_arr1[SIZE_ARR] = { 0.111, 0.222, 0.333, 0.444, 0.555, 0.557, 0.657, 0.735, 0.834, 0.868 };
 float merg_arr2[SIZE_ARR] = { 0.145, 0.168, 0.255, 0.279, 0.345, 0.407, 0.478, 0.563, 0.648, 0.789 };
@@ -26,7 +27,6 @@ int main(int argc, char **argv)
 {
 	int i = 0;
 	int k = 0;
-	int flag = 0;
 	float *res = NULL;
 
 	if (2 != argc)
@@ -48,12 +48,11 @@ int main(int argc, char **argv)
 		if (0 == fork())
 		{
 			/* run child worker */
-			flag = 0;
 			worker(i, total);
+			return 0;
 		}
 		else
 		{
-			flag = 1;
 			/* run parent */
 			printf("Im in parent\n");
 			sleep(1);
@@ -62,6 +61,11 @@ int main(int argc, char **argv)
 			key_t key = ftok(name, 65);
 			// shmget returns an identifier in shmid
 			int shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
+			if(-1 == shmid)
+			{
+				printf("Error shmget()\n");
+				return 1;
+			}
 			// shmat to attach to shared memory
 			float *arr_res = (float*) shmat(shmid, (void*) 0, 0);
 			// TODO memory alokated for result and add data to result
@@ -105,21 +109,31 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (1 == flag)
+	counter++;
+	printf("counter = %d\n", counter);
+	printf("LLLLLLLLLLL\n");
+	/*for (k = 0; k < SIZE; k += 10)
 	{
-		printf("LLLLLLLLLLL\n");
-		for (k = 0; k < SIZE/total; k += 10)
+		printf("[%d] "
+				"%6.3f %6.3f %6.3f %6.3f %6.3f "
+				"%6.3f %6.3f %6.3f %6.3f %6.3f\n", k, res[k],
+				res[k + 1], res[k + 2], res[k + 3], res[k + 4],
+				res[k + 5], res[k + 6], res[k + 7], res[k + 8],
+				res[k + 9]);
+	}
+	printf("\n");
+	*/
+	qsort(res,SIZE,sizeof(float),(int(*)(const void*, const void*)) cmp);
+	for (k = 0; k < SIZE; k += 10)
 		{
-			printf("{%2d} [%d] "
+			printf("[%d] "
 					"%6.3f %6.3f %6.3f %6.3f %6.3f "
-					"%6.3f %6.3f %6.3f %6.3f %6.3f\n", i, k, res[k],
+					"%6.3f %6.3f %6.3f %6.3f %6.3f\n", k, res[k],
 					res[k + 1], res[k + 2], res[k + 3], res[k + 4],
 					res[k + 5], res[k + 6], res[k + 7], res[k + 8],
 					res[k + 9]);
 		}
 		printf("\n");
-	}
-
 	return EXIT_SUCCESS;
 }
 ///////////////////////////////////////
@@ -205,7 +219,7 @@ void func_merg(float merg_arr1[], float merg_arr2[])
 void worker(int part, int total)
 {
 	//char *word = "Hello word";
-	int i = 0;
+	//int i = 0;
 	printf("part = %d total thread = %d\n", part, total);
 	qsort(&arr[SIZE / total * part], SIZE / total, sizeof(float), cmp);
 	/*
