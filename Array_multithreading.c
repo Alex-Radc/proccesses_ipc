@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 {
 	int i = 0;
 	float **res = NULL;
-
+	float *calculation_result = NULL;
 	if (2 != argc)
 	{
 		printf("Error: invalid input param (expect 1 value)");
@@ -59,7 +59,6 @@ int main(int argc, char **argv)
 			/* run parent */
 			printf("Im in parent\n");
 			sleep(1);
-			//char name[20] = {'\0'};
 		}
 		/* run parent */
 		char name[20] = {'\0'};
@@ -74,11 +73,6 @@ int main(int argc, char **argv)
 		}
 		// shmat to attach to shared memory
 		float *arr_res = (float*) shmat(shmid, (void*) 0, 0);
-		// TODO memory alokated for result and add data to result
-
-		//printf("%p\n", arr_res);
-		//printf("%6.3f\n", *arr_res);
-
 		if (NULL == res)
 		{
 			res = (float**) malloc(total * sizeof(float*));
@@ -86,67 +80,21 @@ int main(int argc, char **argv)
 		res[i] = (float*) malloc(SIZE / total * sizeof(float));
 
 		memcpy(res[i], arr_res, (SIZE / total) * sizeof(float));
-		/*if(NULL == res)
-		 {
-		 res = (float*)malloc(sizeof(float)*SIZE);
-		 }
-		 memcpy(&res[(SIZE/total)*i], arr_res, (SIZE/total) * sizeof(float));
-		 */
-
-		/*for (k = 0; k < SIZE/total; k += 10)
-		 {
-		 printf("{%2d} [%d] "
-		 "%6.3f %6.3f %6.3f %6.3f %6.3f "
-		 "%6.3f %6.3f %6.3f %6.3f %6.3f\n", i, k, arr_res[k],
-		 arr_res[k + 1], arr_res[k + 2], arr_res[k + 3], arr_res[k + 4],
-		 arr_res[k + 5], arr_res[k + 6], arr_res[k + 7], arr_res[k + 8],
-		 arr_res[k + 9]);
-		 }*/
-
-		/*
-		 for (k = (SIZE/total)*i; k < (SIZE/total)*(i+1); k += 10)
-		 {
-		 printf("{%2d} [%d] "
-		 "%6.3f %6.3f %6.3f %6.3f %6.3f "
-		 "%6.3f %6.3f %6.3f %6.3f %6.3f\n", i, k, res[k],
-		 res[k + 1], res[k + 2], res[k + 3], res[k + 4],
-		 res[k + 5], res[k + 6], res[k + 7], res[k + 8],
-		 res[k + 9]);
-		 }
-		 */
 		//detach from shared memory
 		shmdt(arr_res);
-
 		// destroy the shared memory
 		shmctl(shmid, IPC_RMID, NULL);
 	}
 counter++;
 printf("counter = %d\n", counter);
-printf("LLLLLLLLLLL\n");
-/*for (k = 0; k < SIZE; k += 10)
- {
- printf("[%d] "
- "%6.3f %6.3f %6.3f %6.3f %6.3f "
- "%6.3f %6.3f %6.3f %6.3f %6.3f\n", k, res[k],
- res[k + 1], res[k + 2], res[k + 3], res[k + 4],
- res[k + 5], res[k + 6], res[k + 7], res[k + 8],
- res[k + 9]);
- }
- printf("\n");
- */
-// array_sort();
 //qsort(res,SIZE,sizeof(float),(int(*)(const void*, const void*)) cmp);
-array_sort(res,total);
-/*for(k = 0; k < SIZE; k += 10)
+calculation_result = array_sort(res,total);
+printf("*******************************************\n");
+for(int k = 0; k < SIZE; k++)
 {
-	printf("[%.3d] "
-			"%6.3f %6.3f %6.3f %6.3f %6.3f "
-			"%6.3f %6.3f %6.3f %6.3f %6.3f\n", k, res[k], res[k + 1],
-			res[k + 2], res[k + 3], res[k + 4], res[k + 5], res[k + 6],
-			res[k + 7], res[k + 8], res[k + 9]);
+	printf("[%d] " "%f\n", k, calculation_result[k]);
 }
 printf("\n");
-*/
 return EXIT_SUCCESS;
 }
 ///////////////////////////////////////
@@ -231,22 +179,8 @@ void func_merg(float merg_arr1[], float merg_arr2[])
 ///////////////////////////////////////////////////////////////
 void worker(int part, int total)
 {
-	//char *word = "Hello word";
-	//int i = 0;
 	printf("part = %d total thread = %d\n", part, total);
 	qsort(&arr[SIZE / total * part], SIZE / total, sizeof(float), cmp);
-	/*
-	for (i = SIZE / total * part; i < SIZE / total * part + SIZE / total; i +=10)
-	{
-
-		  printf("{%2d} [%d] "
-				"%6.3f %6.3f %6.3f %6.3f %6.3f "
-				"%6.3f %6.3f %6.3f %6.3f %6.3f\n", part, i, arr[i], arr[i + 1],
-				arr[i + 2], arr[i + 3], arr[i + 4], arr[i + 5], arr[i + 6],
-				arr[i + 7], arr[i + 8], arr[i + 9]);
-
-	}
-	*/
 	// writer
 	char name[20] = {'\0'};
 	sprintf(name, "%s%d", "shmfile", part);
@@ -257,30 +191,12 @@ void worker(int part, int total)
 	// shmat to attach to shared memory
 	float *shm_array = (float*) shmat(shmid, (void*) 0, 0);
 	memcpy( shm_array, &arr[SIZE / total * part], (SIZE/total) * sizeof(float));
-/*
-	for (int k = 0; k < SIZE/total; k += 10)
-	{
-		printf("{%2d} [%d] "
-				"%6.3f %6.3f %6.3f %6.3f %6.3f "
-				"%6.3f %6.3f %6.3f %6.3f %6.3f\n", i, k, shm_array[k],
-				shm_array[k + 1], shm_array[k + 2], shm_array[k + 3], shm_array[k + 4],
-				shm_array[k + 5], shm_array[k + 6], shm_array[k + 7], shm_array[k + 8],
-				shm_array[k + 9]);
-	}*/
-
 	//detach from shared memory
 	shmdt(shm_array);
 }
 ///////////////////////////////////////////////
 float* array_sort(float **local_arr, int total)
 {
-	/*
-	 * int arr[LINE][ROW] = {{4,3,2,1},
-						      {8,6,7,5},
-						      {12,6,10,9},
-						      {16,15,14,13},
-						      {20,18,19,17}};
-						      */
 		int *index =(int*)malloc(total*sizeof(int));
 		memset(index,0,total*sizeof(int));
 		int i = 0;
@@ -306,7 +222,6 @@ float* array_sort(float **local_arr, int total)
 			{
 				if (index[i] < LINE)
 				{
-					//printf("min = %d cur = %d\n", min ,arr[index[i]][i]);
 					if(min > *(local_arr[i] + index[i]))
 					{
 						min = *(local_arr[i] + index[i]);
@@ -315,11 +230,10 @@ float* array_sort(float **local_arr, int total)
 				}
 			}
 			arr_result[j] = min;
-			printf("min = %f\n", min);
+			//printf("min = %f\n", min);
 			if (index[min_index] < LINE)
 			{
 				index[min_index]++;
-
 			}
 		}
 		return arr_result;
