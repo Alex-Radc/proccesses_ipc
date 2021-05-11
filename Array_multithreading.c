@@ -7,31 +7,36 @@
 #include <sys/shm.h>
 #include <unistd.h>
 
-#define SIZE 300
-#define SIZE_ARR 10
+#define SIZE 300      // remain
+//#define SIZE_ARR 10
 #define CMP_LT(a, b) ((a) < (b))
-#define ROW 10
-#define LINE 30
+//#define ROW 10
+//#define LINE 30
 
 
 float arr[SIZE] ={ 0 };
 static int counter = 0;
 
-float merg_arr1[SIZE_ARR] = { 0.111, 0.222, 0.333, 0.444, 0.555, 0.557, 0.657, 0.735, 0.834, 0.868 };
-float merg_arr2[SIZE_ARR] = { 0.145, 0.168, 0.255, 0.279, 0.345, 0.407, 0.478, 0.563, 0.648, 0.789 };
-float resmerg_arr[SIZE_ARR * 2] = { 0 };
+float merg_arr1[10] = { 0.111, 0.222, 0.333, 0.444, 0.555, 0.557, 0.657, 0.735, 0.834, 0.868 };
+float merg_arr2[10] = { 0.145, 0.168, 0.255, 0.279, 0.345, 0.407, 0.478, 0.563, 0.648, 0.789 };
+float resmerg_arr[10 * 2] = { 0 };
 
-int cmp(const void *a, const void *b);
+int worker_cmp(const void *a, const void *b);
 void initial_array(float arr[], int size);
-void func_merg(float merg_arr1[], float merg_arr2[]);
-void worker(int part, int total);
+void worker_main
+(int part, int total);
 float* array_sort(float **local_arr, int total);
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char **argv)
 {
 	int i = 0;
 	float **res = NULL;
 	float *calculation_result = NULL;
+	char name[20] = {'\0'};
+	int shmid = 0;
+	float *arr_res = NULL;
+
 	if (2 != argc)
 	{
 		printf("Error: invalid input param (expect 1 value)");
@@ -51,7 +56,7 @@ int main(int argc, char **argv)
 		if (0 == fork())
 		{
 			/* run child worker */
-			worker(i, total);
+			worker_main(i, total);
 			return 0;
 		}
 		else
@@ -61,18 +66,17 @@ int main(int argc, char **argv)
 			sleep(1);
 		}
 		/* run parent */
-		char name[20] = {'\0'};
 		sprintf(name, "%s%d", "shmfile", i);
 		key_t key = ftok(name, 65);
 		// shmget returns an identifier in shmid
-		int shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
+		shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
 		if(-1 == shmid)
 		{
 			printf("Error shmget()\n");
 			return 1;
 		}
 		// shmat to attach to shared memory
-		float *arr_res = (float*) shmat(shmid, (void*) 0, 0);
+		arr_res = (float*) shmat(shmid, (void*) 0, 0);
 		if (NULL == res)
 		{
 			res = (float**) malloc(total * sizeof(float*));
@@ -85,20 +89,21 @@ int main(int argc, char **argv)
 		// destroy the shared memory
 		shmctl(shmid, IPC_RMID, NULL);
 	}
-counter++;
-printf("counter = %d\n", counter);
-//qsort(res,SIZE,sizeof(float),(int(*)(const void*, const void*)) cmp);
-calculation_result = array_sort(res,total);
-printf("*******************************************\n");
-for(int k = 0; k < SIZE; k++)
-{
-	printf("[%d] " "%f\n", k, calculation_result[k]);
-}
-printf("\n");
-return EXIT_SUCCESS;
+	counter++;
+	printf("counter = %d\n", counter);
+	//qsort(res,SIZE,sizeof(float),(int(*)(const void*, const void*)) cmp);
+	calculation_result = array_sort(res,total);
+	printf("*******************************************\n");
+	for(int k = 0; k < SIZE; k += 10)
+	{
+		printf("[%d] " "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f\n", k, calculation_result[k],calculation_result[k+1],calculation_result[k+2],calculation_result[k+3],calculation_result[k+4],
+				calculation_result[k+5],calculation_result[k+6],calculation_result[k+7],calculation_result[k+8],calculation_result[k+9]);
+	}
+	printf("\n");
+	return EXIT_SUCCESS;
 }
 ///////////////////////////////////////
-int cmp(const void *a, const void *b)
+int worker_cmp(const void *a, const void *b)
 {
 	return (*(float*) a > *(float*) b) ? 1 : -1;
 }
@@ -152,49 +157,33 @@ void initial_array(float arr[], int size)
 #endif
 }
 /////////////////////////////////////////////////////////////////////////////
-void func_merg(float merg_arr1[], float merg_arr2[])
+void worker_main(int part, int total)
 {
-	int i, j, k;
-	i = j = k = 0;
-	while (i < SIZE_ARR && j < SIZE_ARR)
-	{
-		if (CMP_LT(merg_arr1[i], merg_arr2[j]))
-		{
-			resmerg_arr[k++] = merg_arr1[i++];
-		}
-		else
-		{
-			resmerg_arr[k++] = merg_arr2[j++];
-		}
-	}
-	while (i < SIZE_ARR)
-	{
-		resmerg_arr[k++] = merg_arr1[i++];
-	}
-	while (j < SIZE_ARR)
-	{
-		resmerg_arr[k++] = merg_arr2[j++];
-	}
-}
-///////////////////////////////////////////////////////////////
-void worker(int part, int total)
-{
-	printf("part = %d total thread = %d\n", part, total);
-	qsort(&arr[SIZE / total * part], SIZE / total, sizeof(float), cmp);
-	// writer
 	char name[20] = {'\0'};
+	int shmid = 0;
+	float *shm_array = NULL;
+
+	printf("part = %d total thread = %d\n", part, total);
+	qsort(&arr[SIZE / total * part], SIZE / total, sizeof(float), worker_cmp);
+
+	// writer
 	sprintf(name, "%s%d", "shmfile", part);
 	key_t key = ftok(name, 65);
 	// shmget returns an identifier in shmid
-	int shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
+	shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
 
 	// shmat to attach to shared memory
-	float *shm_array = (float*) shmat(shmid, (void*) 0, 0);
+	shm_array = (float*) shmat(shmid, (void*) 0, 0);
+	if(NULL == shm_array)
+	{
+		printf("function shmat() return error\n");
+	}
 	memcpy( shm_array, &arr[SIZE / total * part], (SIZE/total) * sizeof(float));
 	//detach from shared memory
 	shmdt(shm_array);
 }
 ///////////////////////////////////////////////
+
 float* array_sort(float **local_arr, int total)
 {
 		int *index =(int*)malloc(total*sizeof(int));
@@ -202,14 +191,15 @@ float* array_sort(float **local_arr, int total)
 		int i = 0;
 		int j = 0;
 		float min = 0;
+		int min_index = 0;
 		float *arr_result = (float*)malloc(SIZE* sizeof(float));
 
 		for (j = 0; j < SIZE ; j++)
 		{
-			int min_index = 0;
+
 			for(i = 0; i < total; i++)
 			{
-				if (index[i] < LINE)
+				if (index[i] < 30)
 				{
 					min_index = i;
 					min = *(local_arr[i] + index[i]);
@@ -220,7 +210,7 @@ float* array_sort(float **local_arr, int total)
 
 			for(; i < total; i++)
 			{
-				if (index[i] < LINE)
+				if (index[i] < 30)
 				{
 					if(min > *(local_arr[i] + index[i]))
 					{
@@ -231,7 +221,7 @@ float* array_sort(float **local_arr, int total)
 			}
 			arr_result[j] = min;
 			//printf("min = %f\n", min);
-			if (index[min_index] < LINE)
+			if (index[min_index] < 30)
 			{
 				index[min_index]++;
 			}
