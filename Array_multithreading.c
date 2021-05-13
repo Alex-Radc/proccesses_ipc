@@ -17,15 +17,11 @@
 float arr[SIZE] ={ 0 };
 static int counter = 0;
 
-float merg_arr1[10] = { 0.111, 0.222, 0.333, 0.444, 0.555, 0.557, 0.657, 0.735, 0.834, 0.868 };
-float merg_arr2[10] = { 0.145, 0.168, 0.255, 0.279, 0.345, 0.407, 0.478, 0.563, 0.648, 0.789 };
-float resmerg_arr[10 * 2] = { 0 };
-
 int worker_cmp(const void *a, const void *b);
 void initial_array(float arr[], int size);
-void worker_main
-(int part, int total);
+void worker_main(int part, int total);
 float* array_sort(float **local_arr, int total);
+int run_parent(float **res, int numb_process, int total);
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char **argv)
@@ -33,9 +29,6 @@ int main(int argc, char **argv)
 	int i = 0;
 	float **res = NULL;
 	float *calculation_result = NULL;
-	char name[20] = {'\0'};
-	int shmid = 0;
-	float *arr_res = NULL;
 
 	if (2 != argc)
 	{
@@ -50,6 +43,15 @@ int main(int argc, char **argv)
 		printf("Error: invalid values in params: total = %d\n", total);
 		return 1;
 	}
+
+	res = (float**) malloc(total * sizeof(float*));
+	if(NULL == res)
+	{
+		printf("Error: fail to allocate memory");
+		return 1;
+	}
+	memset(res, NULL, total * sizeof(float*));
+
 	initial_array(arr, SIZE);
 	for (i = 0; i < total; i++)
 	{
@@ -65,29 +67,7 @@ int main(int argc, char **argv)
 			printf("Im in parent\n");
 			sleep(1);
 		}
-		/* run parent */
-		sprintf(name, "%s%d", "shmfile", i);
-		key_t key = ftok(name, 65);
-		// shmget returns an identifier in shmid
-		shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
-		if(-1 == shmid)
-		{
-			printf("Error shmget()\n");
-			return 1;
-		}
-		// shmat to attach to shared memory
-		arr_res = (float*) shmat(shmid, (void*) 0, 0);
-		if (NULL == res)
-		{
-			res = (float**) malloc(total * sizeof(float*));
-		}
-		res[i] = (float*) malloc(SIZE / total * sizeof(float));
-
-		memcpy(res[i], arr_res, (SIZE / total) * sizeof(float));
-		//detach from shared memory
-		shmdt(arr_res);
-		// destroy the shared memory
-		shmctl(shmid, IPC_RMID, NULL);
+		run_parent(res, i, total);
 	}
 	counter++;
 	printf("counter = %d\n", counter);
@@ -197,9 +177,10 @@ float* array_sort(float **local_arr, int total)
 		for (j = 0; j < SIZE ; j++)
 		{
 
+
 			for(i = 0; i < total; i++)
 			{
-				if (index[i] < 30)
+				if (index[i] < SIZE/10)
 				{
 					min_index = i;
 					min = *(local_arr[i] + index[i]);
@@ -210,7 +191,7 @@ float* array_sort(float **local_arr, int total)
 
 			for(; i < total; i++)
 			{
-				if (index[i] < 30)
+				if (index[i] < SIZE/10)
 				{
 					if(min > *(local_arr[i] + index[i]))
 					{
@@ -221,10 +202,37 @@ float* array_sort(float **local_arr, int total)
 			}
 			arr_result[j] = min;
 			//printf("min = %f\n", min);
-			if (index[min_index] < 30)
+			if (index[min_index] < SIZE/10)
 			{
 				index[min_index]++;
 			}
 		}
 		return arr_result;
+}
+///////////////////////////////////////////////
+int run_parent(float **res, int numb_process, int total)
+{
+		char name[20] ={ '\0' };
+		int shmid = 0;
+		float *arr_res = NULL;
+
+		res[numb_process] = (float*)malloc(SIZE / total * sizeof(float));
+		sprintf(name, "%s%d", "shmfile", numb_process);
+		key_t key = ftok(name, 65);
+		// shmget returns an identifier in shmid
+		shmid = shmget(key, (SIZE / total) * sizeof(float), 0666 | IPC_CREAT);
+		if (-1 == shmid)
+		{
+			printf("Error shmget()\n");
+			return 1;
+		}
+		// shmat to attach to shared memory
+		arr_res = (float*) shmat(shmid, (void*) 0, 0);
+
+		memcpy(res[numb_process], arr_res, (SIZE / total) * sizeof(float));
+		//detach from shared memory
+		shmdt(arr_res);
+		// destroy the shared memory
+		shmctl(shmid, IPC_RMID, NULL);
+		return 0;
 }
