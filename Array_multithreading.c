@@ -21,14 +21,15 @@ int worker_cmp(const void *a, const void *b);
 void initial_array(float arr[], int size);
 void worker_main(int part, int total);
 float* array_sort(float **local_arr, int total);
-int run_parent(float **res, int numb_process, int total);
+int run_parent(float **array_raw2d, int numb_process, int total);
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char **argv)
 {
 	int i = 0;
-	float **res = NULL;
+	float **array_raw2d = NULL;
 	float *calculation_result = NULL;
+	int total = atoi(argv[1]);
 
 	if (2 != argc)
 	{
@@ -36,21 +37,19 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	int total = atoi(argv[1]);
-
 	if (0 >= total)
 	{
 		printf("Error: invalid values in params: total = %d\n", total);
 		return 1;
 	}
 
-	res = (float**) malloc(total * sizeof(float*));
-	if(NULL == res)
+	array_raw2d = (float**) malloc(total * sizeof(float*));
+	if(NULL == array_raw2d)
 	{
 		printf("Error: fail to allocate memory");
 		return 1;
 	}
-	memset(res, NULL, total * sizeof(float*));
+	memset(array_raw2d, NULL, total * sizeof(float*));
 
 	initial_array(arr, SIZE);
 	for (i = 0; i < total; i++)
@@ -67,12 +66,12 @@ int main(int argc, char **argv)
 			printf("Im in parent\n");
 			sleep(1);
 		}
-		run_parent(res, i, total);
+		run_parent(array_raw2d, i, total);
 	}
 	counter++;
 	printf("counter = %d\n", counter);
 	//qsort(res,SIZE,sizeof(float),(int(*)(const void*, const void*)) cmp);
-	calculation_result = array_sort(res,total);
+	calculation_result = array_sort(array_raw2d,total);
 	printf("*******************************************\n");
 	for(int k = 0; k < SIZE; k += 10)
 	{
@@ -210,13 +209,13 @@ float* array_sort(float **local_arr, int total)
 		return arr_result;
 }
 ///////////////////////////////////////////////
-int run_parent(float **res, int numb_process, int total)
+int run_parent(float **array_raw2d, int numb_process, int total)
 {
 		char name[20] ={ '\0' };
 		int shmid = 0;
 		float *arr_res = NULL;
 
-		res[numb_process] = (float*)malloc(SIZE / total * sizeof(float));
+		array_raw2d[numb_process] = (float*)malloc(SIZE / total * sizeof(float));
 		sprintf(name, "%s%d", "shmfile", numb_process);
 		key_t key = ftok(name, 65);
 		// shmget returns an identifier in shmid
@@ -229,7 +228,7 @@ int run_parent(float **res, int numb_process, int total)
 		// shmat to attach to shared memory
 		arr_res = (float*) shmat(shmid, (void*) 0, 0);
 
-		memcpy(res[numb_process], arr_res, (SIZE / total) * sizeof(float));
+		memcpy(array_raw2d[numb_process], arr_res, (SIZE / total) * sizeof(float));
 		//detach from shared memory
 		shmdt(arr_res);
 		// destroy the shared memory
