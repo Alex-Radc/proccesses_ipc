@@ -8,11 +8,7 @@
 #include <unistd.h>
 
 #define SIZE 300      // remain
-//#define SIZE_ARR 10
 #define CMP_LT(a, b) ((a) < (b))
-//#define ROW 10
-//#define LINE 30
-
 
 float arr[SIZE] ={ 0 };
 static int counter = 0;
@@ -82,11 +78,20 @@ int main(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 ///////////////////////////////////////
+/*	worker_cmp
+ *  @param in const void *a
+ *  @param in const void *b
+ *  @param out int
+ */
 int worker_cmp(const void *a, const void *b)
 {
 	return (*(float*) a > *(float*) b) ? 1 : -1;
 }
 ////////////////////////////////////////////////
+/*	initial_array
+	@param in float arr[]
+	@param in int size
+ */
 void initial_array(float arr[], int size)
 {
 #if 0
@@ -136,6 +141,10 @@ void initial_array(float arr[], int size)
 #endif
 }
 /////////////////////////////////////////////////////////////////////////////
+/*   worker_main
+ *   @param in int part
+ *   @param in int total, total thread
+ */
 void worker_main(int part, int total)
 {
 	char name[20] = {'\0'};
@@ -150,7 +159,10 @@ void worker_main(int part, int total)
 	key_t key = ftok(name, 65);
 	// shmget returns an identifier in shmid
 	shmid = shmget(key, (SIZE/total) * sizeof(float), 0666 | IPC_CREAT);
-
+	if(0 == shmid)
+	{
+		printf("Error shmid == 0\n");
+	}
 	// shmat to attach to shared memory
 	shm_array = (float*) shmat(shmid, (void*) 0, 0);
 	if(NULL == shm_array)
@@ -162,7 +174,11 @@ void worker_main(int part, int total)
 	shmdt(shm_array);
 }
 ///////////////////////////////////////////////
-
+/*		array_sort
+ *  @param in  float **local_arr
+ *  @param in  int total
+ *  @param out float arr_result
+ */
 float* array_sort(float **local_arr, int total)
 {
 		int *index =(int*)malloc(total*sizeof(int));
@@ -209,6 +225,12 @@ float* array_sort(float **local_arr, int total)
 		return arr_result;
 }
 ///////////////////////////////////////////////
+/*		run_parent
+ * @param in float **array_raw2d
+ * @param in int numb_process
+ * @param in int total
+ * @param out int
+ */
 int run_parent(float **array_raw2d, int numb_process, int total)
 {
 		char name[20] ={ '\0' };
